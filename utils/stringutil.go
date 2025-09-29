@@ -81,6 +81,17 @@ func GetTrieKey(method string, path string) string {
 	return ret
 }
 
+func GetTrieKeyWithPrefix(method, path, prefix string, isPrefix bool) string {
+	if isPrefix {
+		if prefix != "" && prefix[len(prefix)-1] != '/' {
+			prefix += "/"
+		}
+		prefix += "**"
+		return GetTrieKey(method, prefix)
+	}
+	return GetTrieKey(method, path)
+}
+
 func GetIPAndPort(address string) ([]*net.TCPAddr, error) {
 	if len(address) <= 0 {
 		return nil, errors.Errorf("invalid address, %s", address)
