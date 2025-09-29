@@ -32,6 +32,12 @@ benchmark 运行方法
 go test -bench . -benchmem
 ```
 
+功能一致性测试方法
+
+```yaml
+go test -run Parity -v
+```
+
 ### Pixiu 路由引擎升级实践：从全局锁到 RCU 快照
 
 #### 1. 背景：全局锁带来的性能瓶颈
