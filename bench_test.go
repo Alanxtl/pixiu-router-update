@@ -1,4 +1,3 @@
-// bench_test.go
 package pixiu_router_update
 
 import (
@@ -6,15 +5,14 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+)
 
+import (
 	newrouter "github.com/alanxtl/pixiu-router-update/new"
 	newmodel "github.com/alanxtl/pixiu-router-update/new/model"
-
 	oldrouter "github.com/alanxtl/pixiu-router-update/old"
 	oldmodel "github.com/alanxtl/pixiu-router-update/old/model"
 )
-
-// ============= 测试形状与数据生成 =============
 
 type benchShape struct {
 	NRoutes         int     // 路由条数
@@ -22,8 +20,6 @@ type benchShape struct {
 	HeaderOnlyRatio float64 // 仅 header 路由占比（无 path/prefix）
 	Methods         []string
 }
-
-// -------- old 模型的一组构造器 --------
 
 func genRoutesOld(sh benchShape) []*oldmodel.Router {
 	routes := make([]*oldmodel.Router, 0, sh.NRoutes)
@@ -99,7 +95,7 @@ func buildDeltaOld(base []*oldmodel.Router, seed int64) []*oldmodel.Router {
 		old := cp[idx]
 		newPath := "/api/v1/item/" + strconv.Itoa(rnd.Intn(100000))
 		nr := &oldmodel.Router{
-			ID: old.ID, // 保持 ID，不同 Match，等价“更新”
+			ID: old.ID,
 			Match: oldmodel.RouterMatch{
 				Methods: old.Match.Methods,
 				Path:    newPath,
@@ -111,8 +107,6 @@ func buildDeltaOld(base []*oldmodel.Router, seed int64) []*oldmodel.Router {
 	}
 	return out
 }
-
-// -------- new 模型的一组构造器 --------
 
 func genRoutesNew(sh benchShape) []*newmodel.Router {
 	routes := make([]*newmodel.Router, 0, sh.NRoutes)
@@ -201,8 +195,6 @@ func buildDeltaNew(base []*newmodel.Router, seed int64) []*newmodel.Router {
 	return out
 }
 
-// ============= 请求集（两边共享 http.Request） =============
-
 func genRequests(n int) []*http.Request {
 	reqs := make([]*http.Request, 0, n)
 	methods := []string{"GET", "POST"}
@@ -225,7 +217,7 @@ func genRequests(n int) []*http.Request {
 	return reqs
 }
 
-// ============= Bench 1：读吞吐（单线程） =============
+// ============= Bench 1：read throughput (one goroutine) =============
 
 func BenchmarkRoute_ReadThroughput(b *testing.B) {
 	shape := benchShape{NRoutes: 30000, PrefixRatio: 0.4, HeaderOnlyRatio: 0.1, Methods: []string{"GET", "POST"}}
@@ -237,8 +229,7 @@ func BenchmarkRoute_ReadThroughput(b *testing.B) {
 	oldc := buildOldCoordinator(oldRoutes)
 	newc := buildNewCoordinator(newRoutes)
 
-	b.Run("old/locked-read", func(b *testing.B) {
-		rand.Seed(1)
+	b.Run("old/locked-read-30k", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -247,8 +238,7 @@ func BenchmarkRoute_ReadThroughput(b *testing.B) {
 		}
 	})
 
-	b.Run("new/rcu-read", func(b *testing.B) {
-		rand.Seed(1)
+	b.Run("new/rcu-read-30k", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -258,7 +248,7 @@ func BenchmarkRoute_ReadThroughput(b *testing.B) {
 	})
 }
 
-// ============= Bench 2：读吞吐（并行） =============
+// ============= Bench 2：read throughput (parallel) =============
 
 func BenchmarkRoute_ReadParallel(b *testing.B) {
 	shape := benchShape{NRoutes: 30000, PrefixRatio: 0.4, HeaderOnlyRatio: 0.1, Methods: []string{"GET", "POST"}}
@@ -270,10 +260,9 @@ func BenchmarkRoute_ReadParallel(b *testing.B) {
 	oldc := buildOldCoordinator(oldRoutes)
 	newc := buildNewCoordinator(newRoutes)
 
-	b.Run("old/parallel", func(b *testing.B) {
-		rand.Seed(2)
+	b.Run("old/parallel-30k", func(b *testing.B) {
 		b.ReportAllocs()
-		b.SetParallelism(4)
+		b.SetParallelism(40)
 		b.ResetTimer()
 		b.RunParallel(func(pb *testing.PB) {
 			i := rand.Int()
@@ -285,10 +274,9 @@ func BenchmarkRoute_ReadParallel(b *testing.B) {
 		})
 	})
 
-	b.Run("new/parallel", func(b *testing.B) {
-		rand.Seed(2)
+	b.Run("new/parallel-30k", func(b *testing.B) {
 		b.ReportAllocs()
-		b.SetParallelism(4)
+		b.SetParallelism(40)
 		b.ResetTimer()
 		b.RunParallel(func(pb *testing.PB) {
 			i := rand.Int()
@@ -311,8 +299,7 @@ func BenchmarkReload_Latency(b *testing.B) {
 	oldc := buildOldCoordinator(oldBase)
 	newc := buildNewCoordinator(newBase)
 
-	b.Run("old/reload-1percent", func(b *testing.B) {
-		rand.Seed(3)
+	b.Run("old/reload-1percent-30k", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -322,8 +309,7 @@ func BenchmarkReload_Latency(b *testing.B) {
 		}
 	})
 
-	b.Run("new/reload-1percent", func(b *testing.B) {
-		rand.Seed(3)
+	b.Run("new/reload-1percent-30k", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -334,7 +320,107 @@ func BenchmarkReload_Latency(b *testing.B) {
 	})
 }
 
-// ============= Bench 4：RouteByPathAndName（API 行为一致性） =============
+func BenchmarkRoute_100k_ReadThroughput(b *testing.B) {
+	shape := benchShape{
+		NRoutes:         100_000,
+		PrefixRatio:     0.4,
+		HeaderOnlyRatio: 0.1,
+		Methods:         []string{"GET", "POST"},
+	}
+	reqs := genRequests(16_384)
+
+	oldc := buildOldCoordinator(genRoutesOld(shape))
+	newc := buildNewCoordinator(genRoutesNew(shape))
+
+	b.Run("old/locked-read-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			r := reqs[i%len(reqs)]
+			_, _ = oldc.Route(r)
+		}
+	})
+	b.Run("new/rcu-read-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			r := reqs[i%len(reqs)]
+			_, _ = newc.Route(r)
+		}
+	})
+}
+
+func BenchmarkRoute_100k_ReadParallel(b *testing.B) {
+	shape := benchShape{
+		NRoutes:         100_000,
+		PrefixRatio:     0.4,
+		HeaderOnlyRatio: 0.1,
+		Methods:         []string{"GET", "POST"},
+	}
+	reqs := genRequests(32_768)
+
+	oldc := buildOldCoordinator(genRoutesOld(shape))
+	newc := buildNewCoordinator(genRoutesNew(shape))
+
+	b.Run("old/parallel-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetParallelism(4)
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				r := reqs[i&(len(reqs)-1)]
+				_, _ = oldc.Route(r)
+				i++
+			}
+		})
+	})
+	b.Run("new/parallel-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetParallelism(4)
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				r := reqs[i&(len(reqs)-1)]
+				_, _ = newc.Route(r)
+				i++
+			}
+		})
+	})
+}
+
+func BenchmarkReload_100k_Latency_1Percent(b *testing.B) {
+	shape := benchShape{
+		NRoutes:         100_000,
+		PrefixRatio:     0.4,
+		HeaderOnlyRatio: 0.1,
+		Methods:         []string{"GET", "POST"},
+	}
+	oldBase := genRoutesOld(shape)
+	newBase := genRoutesNew(shape)
+
+	oldc := buildOldCoordinator(genRoutesOld(shape))
+	newc := buildNewCoordinator(genRoutesNew(shape))
+
+	b.Run("old/reload-1percent-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			for _, r := range buildDeltaOld(oldBase, int64(i)) {
+				oldc.OnAddRouter(r)
+			}
+		}
+	})
+
+	b.Run("new/reload-1percent-100k", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			for _, r := range buildDeltaNew(newBase, int64(i)) {
+				newc.OnAddRouter(r)
+			}
+		}
+	})
+}
+
+// ============= Bench 4：RouteByPathAndName（API behavior must same） =============
 
 func BenchmarkRouteByPathAndName(b *testing.B) {
 	shape := benchShape{
