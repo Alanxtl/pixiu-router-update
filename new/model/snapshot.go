@@ -122,10 +122,10 @@ func ToSnapshot(cfg *RouteConfiguration) *RouteSnapshot {
 				c := CompiledHeader{Name: h.Name}
 				if h.Regex {
 					// 1) 模型已提供编译好的正则（若有）→ 直接用
-					if h.ValueRegex != nil {
-						c.Regex = h.ValueRegex
+					if h.valueRE != nil {
+						c.Regex = h.valueRE
 					} else if len(h.Values) > 0 && h.Values[0] != "" {
-						// 2) 否则走全局缓存编译（跨快照复用）
+						// 2) 否则走全局缓存/编译（跨快照复用）
 						if re := getCachedRegexp(h.Values[0]); re != nil {
 							c.Regex = re
 						}

@@ -2,6 +2,7 @@ package new
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	util "github.com/alanxtl/pixiu-router-update/utils"
 )
 
+// RouterCoordinator the router coordinator for http connection manager
 type RouterCoordinator struct {
 	active   snapshotHolder // atomic snapshot
 	mu       sync.Mutex
@@ -159,7 +161,10 @@ func initRegex(cfg *model.RouteConfiguration) {
 		headers := router.Match.Headers
 		for i := range headers {
 			if headers[i].Regex && len(headers[i].Values) > 0 {
-				_ = headers[i].SetValueRegex(headers[i].Values[0])
+				if err := headers[i].SetValueRegex(headers[i].Values[0]); err != nil {
+					// todo use logger
+					fmt.Printf("invalid regexp in headers[%d]: %v", i, err)
+				}
 			}
 		}
 	}

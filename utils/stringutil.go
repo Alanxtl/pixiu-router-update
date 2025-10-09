@@ -63,21 +63,29 @@ func IsMatchAll(key string) bool {
 }
 
 func GetTrieKey(method string, path string) string {
+	// "http://localhost:8882/api/v1/test-dubbo/user?name=tc/"
 	ret := ""
-	//"http://localhost:8882/api/v1/test-dubbo/user?name=tc"
+
 	if strings.Contains(path, "://") {
 		path = path[strings.Index(path, "://")+len("://"):]
 		path = path[strings.Index(path, "/")+1:]
 	}
+	// "api/v1/test-dubbo/user?name=tc/"
+
 	if strings.HasPrefix(path, "/") {
 		ret = method + path
 	} else {
 		ret = method + "/" + path
 	}
+	// "METHOD/api/v1/test-dubbo/user?name=tc/"
+
 	if strings.HasSuffix(ret, "/") {
 		ret = ret[0 : len(ret)-1]
 	}
+	// "METHOD/api/v1/test-dubbo/user?name=tc"
+
 	ret = strings.Split(ret, "?")[0]
+	// "METHOD/api/v1/test-dubbo/user"
 	return ret
 }
 

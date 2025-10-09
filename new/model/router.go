@@ -65,11 +65,10 @@ type (
 
 	// HeaderMatcher include Name header key, Values header value, Regex regex value
 	HeaderMatcher struct {
-		Name       string   `yaml:"name" json:"name" mapstructure:"name"`
-		Values     []string `yaml:"values" json:"values" mapstructure:"values"`
-		Regex      bool     `yaml:"regex" json:"regex" mapstructure:"regex"`
-		valueRE    *regexp.Regexp
-		ValueRegex *regexp.Regexp
+		Name    string   `yaml:"name" json:"name" mapstructure:"name"`
+		Values  []string `yaml:"values" json:"values" mapstructure:"values"`
+		Regex   bool     `yaml:"regex" json:"regex" mapstructure:"regex"`
+		valueRE *regexp.Regexp
 	}
 )
 

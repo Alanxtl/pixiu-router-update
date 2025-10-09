@@ -27,27 +27,27 @@ import (
 )
 
 import (
-	"github.com/alanxtl/pixiu-router-update/utils"
+	utils "github.com/alanxtl/pixiu-router-update/utils"
 )
 
-// Trie
+// Trie represents the Trie structure with the root node.
 type Trie struct {
 	root Node
 }
 
-// NewTrie
+// NewTrie creates and returns a new Trie.
 func NewTrie() Trie {
 	return Trie{root: Node{endOfPath: false, matchStr: ""}}
 }
 
-// NewTrieWithDefault
+// NewTrieWithDefault creates a new Trie with a default path and value.
 func NewTrieWithDefault(path string, defVal any) Trie {
 	ret := Trie{root: Node{endOfPath: false, matchStr: ""}}
 	_, _ = ret.Put(path, defVal)
 	return ret
 }
 
-// Node
+// Node represents each node in the Trie.
 type Node struct {
 	matchStr         string           // abc match abc, :a match all words as a variable names a , * match all words  ,** match all words and children.
 	children         map[string]*Node // in path /a/b/c  , b is child of a , c is child of b
@@ -58,42 +58,40 @@ type Node struct {
 	bizInfo          any              // route info and any other info store here.
 }
 
+// Clear resets the Trie to its initial state.
 func (trie *Trie) Clear() bool {
 	return trie.root.Clear()
 }
 
-// IsEmpty put key and values into trie as map.
+// IsEmpty checks if the Trie is empty.
 func (trie *Trie) IsEmpty() bool {
 	return trie.root.IsEmpty()
 }
 
-// Put put key and values into trie as map.
+// Put adds a path and associated business information to the Trie.
 func (trie *Trie) Put(withOutHost string, bizInfo any) (bool, error) {
 	if bizInfo == nil {
 		return false, errors.Errorf("data to put should not be nil.")
 	}
-	parts := stringutil.Split(withOutHost)
+	parts := utils.Split(withOutHost)
 	return trie.root.internalPut(parts, bizInfo)
 }
 
-// Put put key and values into trie as map.
+// PutOrUpdate updates a path and its business info in the Trie.
 func (trie *Trie) PutOrUpdate(withOutHost string, bizInfo any) (bool, error) {
 	if bizInfo == nil {
 		return false, errors.Errorf("data to put should not be nil.")
 	}
-	parts := stringutil.Split(withOutHost)
+	parts := utils.Split(withOutHost)
 	if _, err := trie.Remove(withOutHost); err != nil {
-		fmt.Printf("PutOrUpdate function remote (withOutHost{%s}) = error{%v}", withOutHost, err)
+		fmt.Printf("PutOrUpdate failed for %s: %v", withOutHost, err)
 	}
-	//if n != nil {
-	//	//TODO: log n.bizInfo for trouble shooting
-	//}
 	return trie.root.internalPut(parts, bizInfo)
 }
 
-// Get get values according key.pathVariable not supported.
-func (trie Trie) Get(withOutHost string) (*Node, []string, bool, error) {
-	parts := stringutil.Split(withOutHost)
+// Get retrieves the business info for a path.
+func (trie *Trie) Get(withOutHost string) (*Node, []string, bool, error) {
+	parts := utils.Split(withOutHost)
 	node, param, ok, e := trie.root.Get(parts)
 	length := len(param)
 	for i := 0; i < length/2; i++ {
@@ -104,15 +102,10 @@ func (trie Trie) Get(withOutHost string) (*Node, []string, bool, error) {
 	return node, param, ok, e
 }
 
-// Match get values according url , pathVariable supported.
-// returns:
-// *Node this node in path, if not exists return nil
-// []string   reversed array of pathVariable value   /valA/valB/valC matchs  /:aa/:bb/:cc  returns array of (valC,valB,valA)
-// bool is ok
-// error
-func (trie Trie) Match(withOutHost string) (*Node, []string, bool) {
+// Match checks if the path matches any route in the Trie.
+func (trie *Trie) Match(withOutHost string) (*Node, []string, bool) {
 	withOutHost = strings.Split(withOutHost, "?")[0]
-	parts := stringutil.Split(withOutHost)
+	parts := utils.Split(withOutHost)
 	node, param, ok := trie.root.Match(parts)
 	length := len(param)
 	for i := 0; i < length/2; i++ {
@@ -123,8 +116,8 @@ func (trie Trie) Match(withOutHost string) (*Node, []string, bool) {
 	return node, param, ok
 }
 
-// Remove remove key and value from trie.  logic delete can't release memory, rebuild if necessary when lake of memory.
-func (trie Trie) Remove(withOutHost string) (*Node, error) {
+// Remove removes a path from the Trie.
+func (trie *Trie) Remove(withOutHost string) (*Node, error) {
 	n, _, _, e := trie.Get(withOutHost)
 	if e != nil {
 		return nil, e
@@ -135,9 +128,9 @@ func (trie Trie) Remove(withOutHost string) (*Node, error) {
 	return n, nil
 }
 
-// Contains return if key exists in trie
-func (trie Trie) Contains(withOutHost string) (bool, error) {
-	parts := stringutil.Split(withOutHost)
+// Contains checks if a key exists in the Trie.
+func (trie *Trie) Contains(withOutHost string) (bool, error) {
+	parts := utils.Split(withOutHost)
 	ret, _, _, e := trie.root.Get(parts)
 	if e != nil {
 		return true, e
@@ -145,18 +138,19 @@ func (trie Trie) Contains(withOutHost string) (bool, error) {
 	return !(ret == nil), nil
 }
 
-// Put node put
+// internalPut is the internal logic to put a key and its bizInfo in the Trie
 func (node *Node) internalPut(keys []string, bizInfo any) (bool, error) {
-	// empty node initialization
+	// 初始化子节点
 	if node.children == nil {
-		node.children = map[string]*Node{}
+		node.children = make(map[string]*Node)
 	}
 	if len(keys) == 0 {
 		return true, nil
 	}
 
 	key := keys[0]
-	// isReal is the end of url path, means node is a place of url end,so the path with parentNode has a real url exists.
+	// isReal is the end of url path, means node is a place of url end,
+	// so the path with parentNode has a real url exists.
 	isReal := len(keys) == 1
 	isSuccess := node.put(key, isReal, bizInfo)
 
@@ -165,14 +159,14 @@ func (node *Node) internalPut(keys []string, bizInfo any) (bool, error) {
 	}
 	childKeys := keys[1:]
 
-	if stringutil.IsPathVariableOrWildcard(key) {
+	// 如果是路径变量或通配符路径
+	if utils.IsPathVariableOrWildcard(key) {
 		return node.PathVariableNode.internalPut(childKeys, bizInfo)
-	} else if stringutil.IsMatchAll(key) {
+	} else if utils.IsMatchAll(key) {
 		return isSuccess, nil
 	} else {
 		return node.children[key].internalPut(childKeys, bizInfo)
 	}
-
 }
 
 func (node *Node) Clear() bool {
@@ -248,12 +242,12 @@ func (node *Node) Get(keys []string) (*Node, []string, bool, error) {
 	isReal := len(childKeys) == 0
 	if isReal {
 		// exit condition
-		if stringutil.IsPathVariableOrWildcard(key) {
+		if utils.IsPathVariableOrWildcard(key) {
 			if node.PathVariableNode == nil || !node.PathVariableNode.endOfPath {
 				return nil, nil, false, nil
 			}
-			return node.PathVariableNode, []string{stringutil.VariableName(key)}, true, nil
-		} else if stringutil.IsMatchAll(key) {
+			return node.PathVariableNode, []string{utils.VariableName(key)}, true, nil
+		} else if utils.IsMatchAll(key) {
 			return node.MatchAllNode, nil, true, nil
 		} else {
 			if node.children == nil {
@@ -263,7 +257,7 @@ func (node *Node) Get(keys []string) (*Node, []string, bool, error) {
 		}
 	} else {
 
-		if stringutil.IsPathVariableOrWildcard(key) {
+		if utils.IsPathVariableOrWildcard(key) {
 			if node.PathVariableNode == nil {
 				return nil, nil, false, nil
 			}
@@ -271,7 +265,7 @@ func (node *Node) Get(keys []string) (*Node, []string, bool, error) {
 			newList := []string{key}
 			copy(newList[1:], pathVariableList)
 			return retNode, newList, ok, e
-		} else if stringutil.IsMatchAll(key) {
+		} else if utils.IsMatchAll(key) {
 			return nil, nil, false, errors.Errorf("router configuration is empty")
 		} else {
 			if node.children == nil || node.children[key] == nil {
@@ -284,15 +278,14 @@ func (node *Node) Get(keys []string) (*Node, []string, bool, error) {
 }
 
 func (node *Node) put(key string, isReal bool, bizInfo any) bool {
-
-	if !stringutil.IsPathVariableOrWildcard(key) {
-		if stringutil.IsMatchAll(key) {
+	if !utils.IsPathVariableOrWildcard(key) {
+		if utils.IsMatchAll(key) {
 			return node.putMatchAllNode(key, isReal, bizInfo)
 		} else {
 			return node.putNode(key, isReal, bizInfo)
 		}
 	}
-	pathVariable := stringutil.VariableName(key)
+	pathVariable := utils.VariableName(key)
 	return node.putPathVariable(pathVariable, isReal, bizInfo)
 }
 
@@ -318,7 +311,6 @@ func (node *Node) putPathVariable(pathVariable string, isReal bool, bizInfo any)
 }
 
 func (node *Node) putNode(matchStr string, isReal bool, bizInfo any) bool {
-
 	selfNode := &Node{endOfPath: isReal, matchStr: matchStr}
 	old := node.children[matchStr]
 	if old != nil {
@@ -340,7 +332,6 @@ func (node *Node) putNode(matchStr string, isReal bool, bizInfo any) bool {
 }
 
 func (node *Node) putMatchAllNode(matchStr string, isReal bool, bizInfo any) bool {
-
 	selfNode := &Node{endOfPath: isReal, matchStr: matchStr}
 	old := node.MatchAllNode
 	if old != nil {
